@@ -32,6 +32,10 @@
         color-scheme: dark;
       }
 
+      html {
+        scroll-behavior: smooth;
+      }
+
       body {
         font-family: 'Space Grotesk', system-ui, sans-serif;
       }
@@ -425,6 +429,14 @@
         updateProgress();
       };
 
+      const scrollToSteps = () => {
+        const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        const behavior = prefersReducedMotion ? 'auto' : 'smooth';
+        window.requestAnimationFrame(() => {
+          stepsCard.scrollIntoView({ behavior, block: 'start' });
+        });
+      };
+
       const showRewardBanner = () => {
         if (state.rewardMode === 'extra') {
           rewardBanner.textContent = rewardMessages.extra;
@@ -489,6 +501,7 @@
           statusMessage.textContent = 'Okay, tiny steps coming right up.';
           showRewardBanner();
           showStep();
+          scrollToSteps();
         } catch (error) {
           statusMessage.textContent = 'I hit a snag. Double-check your API key and try again.';
           stepsCard.classList.add('hidden');
