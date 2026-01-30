@@ -4,14 +4,14 @@
 import Stripe from 'stripe';
 import { createClient } from '@supabase/supabase-js';
 
+export const config = {
+  api: { bodyParser: false },
+};
+
 const SUPABASE_URL = 'https://cifkxrxnfbikcbtadbqv.supabase.co';
-const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNpZmt4cnhuZmJpa2NidGFkYnF2Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2OTczMzA4NiwiZXhwIjoyMDg1MzA5MDg2fQ.1hYfj_isFOp38NUPCw1MtWTraJJ85hC-j06YbJXQbGc';
+const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY;
 const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY;
 const STRIPE_WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET;
-
-// Create Supabase admin client
-const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
-const stripe = STRIPE_SECRET_KEY ? new Stripe(STRIPE_SECRET_KEY, { apiVersion: '2023-10-16' }) : null;
 
 const readRawBody = (req) =>
   new Promise((resolve, reject) => {
@@ -42,7 +42,12 @@ export default async function handler(req, res) {
   }
 
   try {
-    if (!stripe) {
+    if (!SUPABASE_SERVICE_KEY) {
+      console.error('Missing SUPABASE_SERVICE_KEY');
+      return res.status(500).json({ error: 'Supabase not configured' });
+    }
+
+    if (!STRIPE_SECRET_KEY) {
       console.error('Missing STRIPE_SECRET_KEY');
       return res.status(500).json({ error: 'Stripe not configured' });
     }
@@ -51,6 +56,9 @@ export default async function handler(req, res) {
       console.error('Missing STRIPE_WEBHOOK_SECRET');
       return res.status(500).json({ error: 'Webhook not configured' });
     }
+
+    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
+    const stripe = new Stripe(STRIPE_SECRET_KEY, { apiVersion: '2023-10-16' });
 
     const signature = req.headers['stripe-signature'];
     if (!signature) {
