@@ -149,11 +149,39 @@
             skipBtn.classList.remove('hidden');
           }
         }, 3000);
-        setTimeout(() => {
+        setTimeout(async () => {
           const loadingScreen = document.getElementById('loading-screen');
           const authSection = document.getElementById('auth-section');
+          const paymentSection = document.getElementById('payment-section');
           if (loadingScreen && !loadingScreen.classList.contains('hidden')) {
-            console.warn('[NUDGE] Absolute failsafe triggered - forcing auth screen');
+            console.warn('[NUDGE] Absolute failsafe triggered');
+            // Check for existing session before showing auth
+            try {
+              const client = window.supabase?.createClient(
+                'https://cifkxrxnfbikcbtadbqv.supabase.co',
+                'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNpZmt4cnhuZmJpa2NidGFkYnF2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk3MzMwODYsImV4cCI6MjA4NTMwOTA4Nn0.gApzwCMN7vWzlWRTWFR4agIuZumCcKbLZGL-mL_Ih9k'
+              );
+              if (client) {
+                const { data } = await client.auth.getSession();
+                if (data?.session?.user) {
+                  console.log('[NUDGE] Failsafe found session for:', data.session.user.email);
+                  // Check subscription status
+                  const { data: profile } = await client.from('users').select('subscription_status').eq('id', data.session.user.id).single();
+                  loadingScreen.classList.add('hidden');
+                  if (profile?.subscription_status === 'active') {
+                    // Show app (will be handled by main script when it loads)
+                    document.getElementById('app-header')?.classList.remove('hidden');
+                    document.getElementById('app')?.classList.remove('hidden');
+                  } else {
+                    paymentSection?.classList.remove('hidden');
+                  }
+                  return;
+                }
+              }
+            } catch (e) {
+              console.warn('[NUDGE] Failsafe session check failed:', e);
+            }
+            // No session found, show auth
             loadingScreen.classList.add('hidden');
             authSection?.classList.remove('hidden');
           }
