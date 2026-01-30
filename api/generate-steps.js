@@ -1,5 +1,5 @@
 // Vercel Serverless Function - Gemini API for Nudge
-const GEMINI_API_KEY = 'AIzaSyBZv4ICB-mQV-v-KJUfc832fBfCzK6-szU';
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 
 export default async function handler(req, res) {
   // CORS headers
@@ -16,6 +16,11 @@ export default async function handler(req, res) {
   }
 
   try {
+    if (!GEMINI_API_KEY) {
+      console.error('Missing GEMINI_API_KEY');
+      return res.status(500).json({ error: 'AI service not configured' });
+    }
+
     const { task, struggle, name, rewardMode } = req.body;
 
     if (!task) {
