@@ -192,7 +192,7 @@
 
         <div class="mt-8 text-center">
           <div class="glass rounded-2xl p-4 inline-block">
-            <p class="text-sm text-slate-300">✨ <strong>Subscription pricing:</strong> $7/month</p>
+            <p class="text-sm text-slate-300">✨ <strong>Subscription pricing:</strong> $7/mo or $60/year (save $24)</p>
           </div>
         </div>
       </section>
@@ -210,11 +210,30 @@
         </div>
 
         <div class="glass pulse-border rounded-[32px] p-6 shadow-glow sm:p-8 max-w-md mx-auto">
-          <div class="text-center mb-6">
-            <p class="text-xs uppercase tracking-[0.4em] text-slate-400 mb-3">Subscription</p>
+          <!-- Pricing Toggle -->
+          <div class="flex justify-center mb-6">
+            <div class="inline-flex rounded-xl bg-slate-800/80 p-1">
+              <button id="plan-monthly" class="plan-toggle px-4 py-2 rounded-lg text-sm font-medium transition-all bg-emerald-500 text-slate-950">Monthly</button>
+              <button id="plan-annual" class="plan-toggle px-4 py-2 rounded-lg text-sm font-medium transition-all text-slate-400 hover:text-white">Annual</button>
+            </div>
+          </div>
+
+          <!-- Monthly Price -->
+          <div id="price-monthly" class="text-center mb-6">
+            <p class="text-xs uppercase tracking-[0.4em] text-slate-400 mb-3">Monthly</p>
             <div class="rounded-2xl border border-slate-700/60 bg-slate-900/70 px-4 py-4">
               <div class="text-3xl font-bold text-white">$7</div>
               <p class="text-sm text-slate-400">per month</p>
+            </div>
+          </div>
+
+          <!-- Annual Price (hidden by default) -->
+          <div id="price-annual" class="text-center mb-6 hidden">
+            <p class="text-xs uppercase tracking-[0.4em] text-slate-400 mb-3">Annual</p>
+            <div class="rounded-2xl border border-emerald-500/40 bg-slate-900/70 px-4 py-4 relative">
+              <div class="absolute -top-3 left-1/2 -translate-x-1/2 bg-emerald-500 text-slate-950 text-xs font-bold px-3 py-1 rounded-full">SAVE $24</div>
+              <div class="text-3xl font-bold text-white">$60</div>
+              <p class="text-sm text-slate-400">per year <span class="text-emerald-400">($5/mo)</span></p>
             </div>
           </div>
 
@@ -237,11 +256,11 @@
           </ul>
 
           <button id="checkout-btn" class="glow-button w-full rounded-2xl bg-emerald-400 px-4 py-4 text-base font-semibold text-slate-950 transition hover:bg-emerald-300">
-            Subscribe for $7/month
+            <span id="checkout-btn-text">Subscribe for $7/month</span>
           </button>
 
           <p class="mt-4 text-center text-sm text-slate-400">
-            Secure payment via Stripe. 30-day money-back guarantee.
+            Secure payment via Stripe. Cancel anytime.
           </p>
         </div>
 
@@ -403,7 +422,9 @@
       // ==================== SUPABASE CONFIG ====================
       const SUPABASE_URL = 'https://cifkxrxnfbikcbtadbqv.supabase.co';
       const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNpZmt4cnhuZmJpa2NidGFkYnF2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk3MzMwODYsImV4cCI6MjA4NTMwOTA4Nn0.gApzwCMN7vWzlWRTWFR4agIuZumCcKbLZGL-mL_Ih9k';
-      const STRIPE_PAYMENT_LINK = 'https://buy.stripe.com/00w9AVcsyc8faYS6LCcbC02';
+      const STRIPE_PAYMENT_LINK_MONTHLY = 'https://buy.stripe.com/00w9AVcsyc8faYS6LCcbC02';
+      const STRIPE_PAYMENT_LINK_ANNUAL = 'https://buy.stripe.com/3cIbJ3fEKa07aYSda0cbC03';
+      let selectedPlan = 'monthly';
       
       // Create Supabase client with error handling
       let supabase;
@@ -584,7 +605,8 @@
       const redirectToPayment = () => {
         // Add client_reference_id with user email for webhook matching
         const email = state.user?.email || '';
-        const paymentUrl = `${STRIPE_PAYMENT_LINK}?prefilled_email=${encodeURIComponent(email)}&client_reference_id=${state.user?.id || ''}`;
+        const paymentLink = selectedPlan === 'annual' ? STRIPE_PAYMENT_LINK_ANNUAL : STRIPE_PAYMENT_LINK_MONTHLY;
+        const paymentUrl = `${paymentLink}?prefilled_email=${encodeURIComponent(email)}&client_reference_id=${state.user?.id || ''}`;
         window.location.href = paymentUrl;
       };
 
@@ -718,6 +740,29 @@
       document.getElementById('logout-btn').addEventListener('click', signOut);
       document.getElementById('logout-btn-payment').addEventListener('click', signOut);
       document.getElementById('checkout-btn').addEventListener('click', redirectToPayment);
+
+      // Pricing toggle
+      document.getElementById('plan-monthly').addEventListener('click', () => {
+        selectedPlan = 'monthly';
+        document.getElementById('plan-monthly').classList.add('bg-emerald-500', 'text-slate-950');
+        document.getElementById('plan-monthly').classList.remove('text-slate-400');
+        document.getElementById('plan-annual').classList.remove('bg-emerald-500', 'text-slate-950');
+        document.getElementById('plan-annual').classList.add('text-slate-400');
+        document.getElementById('price-monthly').classList.remove('hidden');
+        document.getElementById('price-annual').classList.add('hidden');
+        document.getElementById('checkout-btn-text').textContent = 'Subscribe for $7/month';
+      });
+
+      document.getElementById('plan-annual').addEventListener('click', () => {
+        selectedPlan = 'annual';
+        document.getElementById('plan-annual').classList.add('bg-emerald-500', 'text-slate-950');
+        document.getElementById('plan-annual').classList.remove('text-slate-400');
+        document.getElementById('plan-monthly').classList.remove('bg-emerald-500', 'text-slate-950');
+        document.getElementById('plan-monthly').classList.add('text-slate-400');
+        document.getElementById('price-annual').classList.remove('hidden');
+        document.getElementById('price-monthly').classList.add('hidden');
+        document.getElementById('checkout-btn-text').textContent = 'Subscribe for $60/year';
+      });
 
       // Onboarding
       nameNext.addEventListener('click', () => {
