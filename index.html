@@ -381,7 +381,17 @@
       const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNpZmt4cnhuZmJpa2NidGFkYnF2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk3MzMwODYsImV4cCI6MjA4NTMwOTA4Nn0.gApzwCMN7vWzlWRTWFR4agIuZumCcKbLZGL-mL_Ih9k';
       const STRIPE_PAYMENT_LINK = 'https://buy.stripe.com/00w9AVcsyc8faYS6LCcbC02';
       
-      const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+      // Create Supabase client with error handling
+      let supabase;
+      try {
+        supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        console.log('Supabase client created successfully');
+      } catch (e) {
+        console.error('Failed to create Supabase client:', e);
+        // Fallback - show auth screen
+        document.getElementById('loading-screen')?.classList.add('hidden');
+        document.getElementById('auth-section')?.classList.remove('hidden');
+      }
 
       // ==================== DOM ELEMENTS ====================
       const loadingScreen = document.getElementById('loading-screen');
@@ -810,7 +820,13 @@
       });
 
       // ==================== INIT ====================
-      initAuth();
+      // Ensure all scripts are loaded before initializing
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initAuth);
+      } else {
+        // DOM already loaded, but wait a tick for Supabase
+        setTimeout(initAuth, 0);
+      }
     </script>
   </body>
 </html>
