@@ -532,54 +532,75 @@
       const initAuth = async () => {
         showScreen('loading');
 
-        // Check for existing session
-        const { data: { session } } = await supabase.auth.getSession();
-        
-        if (session?.user) {
-          state.user = session.user;
-          userEmailDisplay.textContent = state.user.email;
+        try {
+          // Check for existing session with timeout
+          const sessionPromise = supabase.auth.getSession();
+          const timeoutPromise = new Promise((_, reject) => 
+            setTimeout(() => reject(new Error('Session check timeout')), 5000)
+          );
           
-          // Get user profile
-          state.userProfile = await getUserProfile(state.user.id);
+          const { data: { session }, error } = await Promise.race([sessionPromise, timeoutPromise]);
           
-          // Check for payment success in URL
-          await checkPaymentFromUrl();
-          
-          // Check payment status
-          if (state.userProfile?.subscription_status === 'active') {
-            showScreen('app');
-            initApp();
-          } else {
-            showScreen('payment');
+          if (error) {
+            console.error('Session error:', error);
+            showScreen('auth');
+            return;
           }
-        } else {
-          showScreen('auth');
-        }
-
-        // Listen for auth changes
-        supabase.auth.onAuthStateChange(async (event, session) => {
-          if (event === 'SIGNED_IN' && session?.user) {
+          
+          if (session?.user) {
             state.user = session.user;
             userEmailDisplay.textContent = state.user.email;
             
-            // Small delay to allow trigger to create user profile
-            await new Promise(resolve => setTimeout(resolve, 1000));
-            
+            // Get user profile
             state.userProfile = await getUserProfile(state.user.id);
             
             // Check for payment success in URL
             await checkPaymentFromUrl();
             
+            // Check payment status
             if (state.userProfile?.subscription_status === 'active') {
               showScreen('app');
               initApp();
             } else {
               showScreen('payment');
             }
-          } else if (event === 'SIGNED_OUT') {
-            state.user = null;
-            state.userProfile = null;
+          } else {
             showScreen('auth');
+          }
+        } catch (err) {
+          console.error('Auth initialization failed:', err);
+          // Fallback to auth screen on any error
+          showScreen('auth');
+        }
+
+        // Listen for auth changes
+        supabase.auth.onAuthStateChange(async (event, session) => {
+          try {
+            if (event === 'SIGNED_IN' && session?.user) {
+              state.user = session.user;
+              userEmailDisplay.textContent = state.user.email;
+              
+              // Small delay to allow trigger to create user profile
+              await new Promise(resolve => setTimeout(resolve, 1000));
+              
+              state.userProfile = await getUserProfile(state.user.id);
+              
+              // Check for payment success in URL
+              await checkPaymentFromUrl();
+              
+              if (state.userProfile?.subscription_status === 'active') {
+                showScreen('app');
+                initApp();
+              } else {
+                showScreen('payment');
+              }
+            } else if (event === 'SIGNED_OUT') {
+              state.user = null;
+              state.userProfile = null;
+              showScreen('auth');
+            }
+          } catch (err) {
+            console.error('Auth state change error:', err);
           }
         });
       };
