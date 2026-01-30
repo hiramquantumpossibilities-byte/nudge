@@ -164,6 +164,27 @@
             Continue with Google
           </button>
 
+          <div class="my-6 flex items-center gap-3 text-xs uppercase tracking-[0.4em] text-slate-500">
+            <span class="h-px flex-1 bg-slate-700/60"></span>
+            <span>or</span>
+            <span class="h-px flex-1 bg-slate-700/60"></span>
+          </div>
+
+          <div class="space-y-3">
+            <input
+              id="email-input"
+              type="email"
+              placeholder="you@example.com"
+              class="w-full rounded-2xl border border-slate-700/50 bg-slate-900/70 px-4 py-3 text-base text-slate-100 placeholder:text-slate-500 focus:border-indigo-400 focus:outline-none"
+            />
+            <button
+              id="email-login-btn"
+              class="glow-button w-full rounded-2xl bg-slate-800 px-4 py-3 text-base font-semibold text-white transition hover:bg-slate-700"
+            >
+              Email me a sign-in link
+            </button>
+          </div>
+
           <div class="mt-6 text-center text-sm text-slate-400">
             <p>By signing in, you agree to our <a href="#" class="text-indigo-400 hover:underline">Terms</a> and <a href="#" class="text-indigo-400 hover:underline">Privacy Policy</a>.</p>
           </div>
@@ -404,6 +425,7 @@
       const onboardingStep3 = document.getElementById('onboarding-step-3');
       const nameInput = document.getElementById('name-input');
       const nameNext = document.getElementById('name-next');
+      const emailInput = document.getElementById('email-input');
       const struggleGreeting = document.getElementById('struggle-greeting');
       const struggleOptions = document.querySelectorAll('.struggle-option');
       const struggleInput = document.getElementById('struggle-input');
@@ -438,6 +460,29 @@
         rewardMode: 'normal',
       };
 
+      const AUTH_TIMEOUT_MS = 3000;
+
+      const withTimeout = (promise, timeoutMs, label) =>
+        new Promise((resolve, reject) => {
+          const timer = setTimeout(() => reject(new Error(`${label} timeout`)), timeoutMs);
+          promise
+            .then((value) => {
+              clearTimeout(timer);
+              resolve(value);
+            })
+            .catch((error) => {
+              clearTimeout(timer);
+              reject(error);
+            });
+        });
+
+      const ensureSupabase = () => {
+        if (supabase) return true;
+        console.error('Supabase client unavailable');
+        alert('Auth is unavailable right now. Please refresh and try again.');
+        return false;
+      };
+
       // ==================== AUTH FUNCTIONS ====================
       const showScreen = (screen) => {
         loadingScreen.classList.add('hidden');
@@ -469,6 +514,7 @@
       };
 
       const signInWithGoogle = async () => {
+        if (!ensureSupabase()) return;
         const { error } = await supabase.auth.signInWithOAuth({
           provider: 'google',
           options: {
@@ -481,8 +527,38 @@
         }
       };
 
+      const signInWithEmail = async () => {
+        if (!ensureSupabase()) return;
+        const email = emailInput.value.trim();
+        if (!email) {
+          emailInput.focus();
+          return;
+        }
+
+        const { error } = await supabase.auth.signInWithOtp({
+          email,
+          options: {
+            emailRedirectTo: window.location.origin + window.location.pathname
+          }
+        });
+
+        if (error) {
+          console.error('Email sign-in error:', error);
+          alert('Could not send the sign-in email. Please try again.');
+          return;
+        }
+
+        alert('Check your email for a sign-in link.');
+      };
+
       const signOut = async () => {
-        await supabase.auth.signOut();
+        if (!ensureSupabase()) return;
+        const { error } = await supabase.auth.signOut();
+        if (error) {
+          console.error('Sign out error:', error);
+          alert('Could not sign out. Please try again.');
+          return;
+        }
         state.user = null;
         state.userProfile = null;
         showScreen('auth');
@@ -539,78 +615,86 @@
         window.location.href = paymentUrl;
       };
 
+      const handleSession = async (session) => {
+        if (!session?.user) {
+          state.user = null;
+          state.userProfile = null;
+          showScreen('auth');
+          return;
+        }
+
+        state.user = session.user;
+        userEmailDisplay.textContent = state.user.email || '';
+
+        state.userProfile = await getUserProfile(state.user.id);
+        if (!state.userProfile) {
+          showScreen('auth');
+          return;
+        }
+
+        await checkPaymentFromUrl();
+
+        if (state.userProfile.subscription_status === 'active') {
+          showScreen('app');
+          initApp();
+        } else {
+          showScreen('payment');
+        }
+      };
+
       const initAuth = async () => {
         showScreen('loading');
+        if (!ensureSupabase()) {
+          showScreen('auth');
+          return;
+        }
+
+        const fallbackTimer = setTimeout(() => {
+          if (!loadingScreen.classList.contains('hidden')) {
+            console.warn('Loading timeout - forcing auth screen');
+            showScreen('auth');
+          }
+        }, AUTH_TIMEOUT_MS);
 
         try {
-          // Check for existing session with timeout
-          const sessionPromise = supabase.auth.getSession();
-          const timeoutPromise = new Promise((_, reject) => 
-            setTimeout(() => reject(new Error('Session check timeout')), 5000)
+          const sessionResult = await withTimeout(
+            supabase.auth.getSession(),
+            AUTH_TIMEOUT_MS,
+            'Session check'
           );
-          
-          const { data: { session }, error } = await Promise.race([sessionPromise, timeoutPromise]);
-          
-          if (error) {
-            console.error('Session error:', error);
+
+          if (sessionResult.error) {
+            console.error('Session error:', sessionResult.error);
             showScreen('auth');
-            return;
-          }
-          
-          if (session?.user) {
-            state.user = session.user;
-            userEmailDisplay.textContent = state.user.email;
-            
-            // Get user profile
-            state.userProfile = await getUserProfile(state.user.id);
-            
-            // Check for payment success in URL
-            await checkPaymentFromUrl();
-            
-            // Check payment status
-            if (state.userProfile?.subscription_status === 'active') {
-              showScreen('app');
-              initApp();
-            } else {
-              showScreen('payment');
-            }
           } else {
-            showScreen('auth');
+            await handleSession(sessionResult.data?.session);
           }
         } catch (err) {
           console.error('Auth initialization failed:', err);
-          // Fallback to auth screen on any error
           showScreen('auth');
+        } finally {
+          clearTimeout(fallbackTimer);
         }
 
         // Listen for auth changes
         supabase.auth.onAuthStateChange(async (event, session) => {
           try {
-            if (event === 'SIGNED_IN' && session?.user) {
-              state.user = session.user;
-              userEmailDisplay.textContent = state.user.email;
-              
-              // Small delay to allow trigger to create user profile
-              await new Promise(resolve => setTimeout(resolve, 1000));
-              
-              state.userProfile = await getUserProfile(state.user.id);
-              
-              // Check for payment success in URL
-              await checkPaymentFromUrl();
-              
-              if (state.userProfile?.subscription_status === 'active') {
-                showScreen('app');
-                initApp();
-              } else {
-                showScreen('payment');
-              }
-            } else if (event === 'SIGNED_OUT') {
+            if (event === 'SIGNED_OUT') {
               state.user = null;
               state.userProfile = null;
               showScreen('auth');
+              return;
+            }
+
+            if (session?.user) {
+              showScreen('loading');
+              // Small delay to allow trigger to create user profile
+              await new Promise(resolve => setTimeout(resolve, 1000));
+              await handleSession(session);
             }
           } catch (err) {
             console.error('Auth state change error:', err);
+            showScreen('auth');
           }
         });
       };
@@ -659,6 +743,7 @@
       // ==================== EVENT LISTENERS ====================
       // Auth buttons
       document.getElementById('google-login-btn').addEventListener('click', signInWithGoogle);
+      document.getElementById('email-login-btn').addEventListener('click', signInWithEmail);
       document.getElementById('logout-btn').addEventListener('click', signOut);
       document.getElementById('logout-btn-payment').addEventListener('click', signOut);
       document.getElementById('checkout-btn').addEventListener('click', redirectToPayment);
@@ -820,15 +905,6 @@
       });
 
       // ==================== INIT ====================
-      // Forced fallback - if still on loading after 3 seconds, show auth
-      setTimeout(() => {
-        const loadingScreen = document.getElementById('loading-screen');
-        if (loadingScreen && !loadingScreen.classList.contains('hidden')) {
-          console.warn('Loading timeout - forcing auth screen');
-          showScreen('auth');
-        }
-      }, 3000);
-
       // Start auth initialization
       initAuth();
     </script>
