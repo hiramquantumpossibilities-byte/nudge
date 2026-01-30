@@ -1,0 +1,9 @@
+{
+  "name": "nudge-codex",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@supabase/supabase-js": "^2.50.0",
+    "stripe": "^15.12.0"
+  }
+}
