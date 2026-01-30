@@ -820,13 +820,17 @@
       });
 
       // ==================== INIT ====================
-      // Ensure all scripts are loaded before initializing
-      if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', initAuth);
-      } else {
-        // DOM already loaded, but wait a tick for Supabase
-        setTimeout(initAuth, 0);
-      }
+      // Forced fallback - if still on loading after 3 seconds, show auth
+      setTimeout(() => {
+        const loadingScreen = document.getElementById('loading-screen');
+        if (loadingScreen && !loadingScreen.classList.contains('hidden')) {
+          console.warn('Loading timeout - forcing auth screen');
+          showScreen('auth');
+        }
+      }, 3000);
+
+      // Start auth initialization
+      initAuth();
     </script>
   </body>
 </html>
