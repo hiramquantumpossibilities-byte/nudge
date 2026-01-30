@@ -1,13 +1,31 @@
 // Vercel Serverless Function - Stripe Webhook Handler
 // This handles payment confirmations from Stripe and updates Supabase
 
+import Stripe from 'stripe';
 import { createClient } from '@supabase/supabase-js';
 
 const SUPABASE_URL = 'https://cifkxrxnfbikcbtadbqv.supabase.co';
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNpZmt4cnhuZmJpa2NidGFkYnF2Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2OTczMzA4NiwiZXhwIjoyMDg1MzA5MDg2fQ.1hYfj_isFOp38NUPCw1MtWTraJJ85hC-j06YbJXQbGc';
+const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY;
+const STRIPE_WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET;
 
 // Create Supabase admin client
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
+const stripe = STRIPE_SECRET_KEY ? new Stripe(STRIPE_SECRET_KEY, { apiVersion: '2023-10-16' }) : null;
+
+const readRawBody = (req) =>
+  new Promise((resolve, reject) => {
+    const chunks = [];
+    req.on('data', (chunk) => {
+      chunks.push(Buffer.from(chunk));
+    });
+    req.on('end', () => {
+      resolve(Buffer.concat(chunks));
+    });
+    req.on('error', (err) => {
+      reject(err);
+    });
+  });
 
 export default async function handler(req, res) {
   // CORS headers
@@ -24,7 +42,29 @@ export default async function handler(req, res) {
   }
 
   try {
-    const event = req.body;
+    if (!stripe) {
+      console.error('Missing STRIPE_SECRET_KEY');
+      return res.status(500).json({ error: 'Stripe not configured' });
+    }
+
+    if (!STRIPE_WEBHOOK_SECRET) {
+      console.error('Missing STRIPE_WEBHOOK_SECRET');
+      return res.status(500).json({ error: 'Webhook not configured' });
+    }
+
+    const signature = req.headers['stripe-signature'];
+    if (!signature) {
+      return res.status(400).json({ error: 'Missing Stripe-Signature header' });
+    }
+
+    const rawBody = await readRawBody(req);
+    let event;
+    try {
+      event = stripe.webhooks.constructEvent(rawBody, signature, STRIPE_WEBHOOK_SECRET);
+    } catch (err) {
+      console.error('Webhook signature verification failed:', err.message);
+      return res.status(400).json({ error: 'Invalid signature' });
+    }
 
     // Handle checkout.session.completed event
     if (event.type === 'checkout.session.completed') {
