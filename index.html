@@ -136,7 +136,35 @@
       <section id="loading-screen" class="relative z-10 flex flex-col items-center justify-center min-h-[60vh]">
         <div class="spinner mb-4"></div>
         <p class="text-slate-400">Loading Nudge...</p>
+        <button id="skip-loading" class="hidden mt-6 text-sm text-indigo-400 hover:text-indigo-300 underline underline-offset-4" onclick="window.__skipToAuth && window.__skipToAuth()">
+          Taking too long? Tap here
+        </button>
       </section>
+      <script>
+        // Absolute failsafe - shows escape after 3s, forces auth after 8s
+        setTimeout(() => {
+          const skipBtn = document.getElementById('skip-loading');
+          const loadingScreen = document.getElementById('loading-screen');
+          if (skipBtn && loadingScreen && !loadingScreen.classList.contains('hidden')) {
+            skipBtn.classList.remove('hidden');
+          }
+        }, 3000);
+        setTimeout(() => {
+          const loadingScreen = document.getElementById('loading-screen');
+          const authSection = document.getElementById('auth-section');
+          if (loadingScreen && !loadingScreen.classList.contains('hidden')) {
+            console.warn('[NUDGE] Absolute failsafe triggered - forcing auth screen');
+            loadingScreen.classList.add('hidden');
+            authSection?.classList.remove('hidden');
+          }
+        }, 8000);
+        window.__skipToAuth = () => {
+          const loadingScreen = document.getElementById('loading-screen');
+          const authSection = document.getElementById('auth-section');
+          loadingScreen?.classList.add('hidden');
+          authSection?.classList.remove('hidden');
+        };
+      </script>
 
       <!-- AUTH SECTION - Login/Signup -->
       <section id="auth-section" class="hidden relative z-10">
