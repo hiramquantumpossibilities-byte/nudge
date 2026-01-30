@@ -5,12 +5,10 @@
 import { createClient } from '@supabase/supabase-js';
 
 const SUPABASE_URL = 'https://cifkxrxnfbikcbtadbqv.supabase.co';
-const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNpZmt4cnhuZmJpa2NidGFkYnF2Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2OTczMzA4NiwiZXhwIjoyMDg1MzA5MDg2fQ.1hYfj_isFOp38NUPCw1MtWTraJJ85hC-j06YbJXQbGc';
+const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY;
 
 // Simple admin secret for manual activation (change this!)
-const ADMIN_SECRET = process.env.ADMIN_SECRET || 'nudge-admin-2026';
-
-const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
+const ADMIN_SECRET = process.env.ADMIN_SECRET;
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -26,6 +24,18 @@ export default async function handler(req, res) {
   }
 
   try {
+    if (!SUPABASE_SERVICE_KEY) {
+      console.error('Missing SUPABASE_SERVICE_KEY');
+      return res.status(500).json({ error: 'Supabase not configured' });
+    }
+
+    if (!ADMIN_SECRET) {
+      console.error('Missing ADMIN_SECRET');
+      return res.status(500).json({ error: 'Admin secret not configured' });
+    }
+
+    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
+
     // Check admin authorization
     const authHeader = req.headers.authorization;
     if (!authHeader || authHeader !== `Bearer ${ADMIN_SECRET}`) {
