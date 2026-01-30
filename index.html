@@ -578,36 +578,6 @@
         return data;
       };
 
-      const updatePaymentStatus = async (userId, status) => {
-        const { error } = await supabase
-          .from('users')
-          .update({ subscription_status: status, updated_at: new Date().toISOString() })
-          .eq('id', userId);
-        
-        if (error) {
-          console.error('Error updating payment status:', error);
-          return false;
-        }
-        return true;
-      };
-
-      const checkPaymentFromUrl = async () => {
-        const urlParams = new URLSearchParams(window.location.search);
-        const paymentSuccess = urlParams.get('payment');
-        
-        if (paymentSuccess === 'success' && state.user) {
-          // Update user status to active
-          const success = await updatePaymentStatus(state.user.id, 'active');
-          if (success) {
-            state.userProfile.subscription_status = 'active';
-            // Clean up URL
-            window.history.replaceState({}, document.title, window.location.pathname);
-            return true;
-          }
-        }
-        return false;
-      };
-
       const redirectToPayment = () => {
         // Add client_reference_id with user email for webhook matching
         const email = state.user?.email || '';
@@ -631,8 +601,6 @@
           showScreen('auth');
           return;
         }
-
-        await checkPaymentFromUrl();
 
         if (state.userProfile.subscription_status === 'active') {
           showScreen('app');
